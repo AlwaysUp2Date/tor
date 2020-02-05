@@ -1,0 +1,27 @@
+name: AutoUpdate
+
+on:
+  schedule:
+    - cron:  '0 */1 * * *'
+
+jobs:
+  one:
+    name: AutoUpdate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@master
+      - name: AutoUpdate
+        run: |
+          git config user.name "T-vK"
+          git config user.email "t-vk@users.noreply.github.com"
+          git remote set-url --push origin "https://${GITHUB_ACTOR}:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}"
+          export LATEST_ALPINE_PACKAGE_VERSION=$(docker run alpine:latest sh -c "apk update -q && apk info tor --description | grep 'tor-' | cut -d ' ' -f1 | cut -d '-' -f2-")
+          export LATEST_DOCKER_HUB_VERSION=$(curl -s -S "https://registry.hub.docker.com/v2/repositories/alwaysup2date/tor/tags/" | jq -r '."results"[]["name"]' | sed -n 1p)
+          echo "LATEST_DOCKER_HUB_VERSION: $LATEST_DOCKER_HUB_VERSION"
+          echo "LATEST_ALPINE_PACKAGE_VERSION: $LATEST_ALPINE_PACKAGE_VERSION"
+          if [ "$LATEST_DOCKER_HUB_VERSION" != "$LATEST_ALPINE_PACKAGE_VERSION" ] ; then
+              git tag -l | xargs -n 1 git push --delete origin || :
+              git tag | xargs git tag -d || :
+              git tag "$LATEST_ALPINE_PACKAGE_VERSION"
+              git push --tags
+          fi
